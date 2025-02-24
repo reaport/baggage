@@ -13,10 +13,19 @@ public class BaggageController : ControllerBase
     private static readonly HttpClient client = new();
 
     // Вместимость одной машины
-    private const double VehicleCapacity = 500.0;
+    private double VehicleCapacity = 500.0;
+    
+    // Скорость машины (в м/с)
+    private const double SpeedCar = 8;
 
     // Словарь для хранения машин
-    private static readonly Dictionary<string, string> vehicleNodeMapping = new();
+    private static readonly Dictionary<string, string> vehicleNodeMapping = new Dictionary<string, string>
+    {
+        ["baggage1"] = "node1",
+        ["baggage2"] = "node2",
+        ["baggage3"] = "node3"
+    };
+        //new();
 
     public class BaggageLoadRequest
     {
@@ -48,7 +57,7 @@ public class BaggageController : ControllerBase
         public string VehicleId { get; set; }
     }
 
-    public async Task<RegisterVehicleResponse?> RegisterVehicleAsync(string vehicleType)
+    private async Task<RegisterVehicleResponse?> RegisterVehicleAsync(string vehicleType)
     {
         // Формирование URL для запроса
         string url = $"/register-vehicle/{vehicleType}";
@@ -118,6 +127,100 @@ public class BaggageController : ControllerBase
 
         return null; // Если запрос не удался, возвращаем null
     }
+
+    public class MoveResponse
+    {
+        public double Distance { get; set; }
+    }
+
+    private async Task<double?> GetPermissionAsync(string vehicleId, string from, string to)
+    {
+        client.DefaultRequestHeaders.Accept.Clear();
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        // Создаем тело запроса
+        var jsonData = new
+        {
+            vehicleId,
+            vehicleType = "baggage",
+            from,
+            to
+        };
+        var json = JsonConvert.SerializeObject(jsonData);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Отправляем POST-запрос
+        var response = await client.PostAsync("/move", content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadAsStringAsync();
+            MoveResponse moveResponse = JsonConvert.DeserializeObject<MoveResponse>(result);
+            Console.WriteLine($"Distance: {moveResponse.Distance}");
+            return moveResponse.Distance;
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // Обработка ошибки 400 (Неверные данные)
+            Console.WriteLine($"Ошибка 400: Неверный запрос.");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+        {
+            // Обработка ошибки 403 (Запрещено)
+            Console.WriteLine("Ошибка 403: Перемещение запрещено. У вас нет прав для выполнения этого действия.");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            //Обработка ошибки 404 
+            Console.WriteLine("Один из узлов не найден.");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            // Обработка ошибки 409 (Узел занят)
+            Console.WriteLine($"Узел сейчас занят, попробуйте позже");
+            // Добавляем 1-секундную задержку перед повторным вызовом функции
+            await Task.Delay(1000);
+            // Повторный вызов функции с теми же параметрами
+            return await GetPermissionAsync(vehicleId, from, to);
+        }
+        else
+        {
+            // Обработка других ошибок
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Произошла неизвестная ошибка: {response.ReasonPhrase}, содержимое: {errorContent}");
+        }
+
+        return null; // Если запрос не удался, возвращаем null
+    }
+
+    private static readonly object lockObject = new object(); // Объект для блокировки
+    private async void informAboutArrivalAsync(string vehicleId, string nodeId)
+    {
+        client.DefaultRequestHeaders.Accept.Clear();
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        // Создаем тело запроса
+        var jsonData = new
+        {
+            vehicleId,
+            vehicleType = "baggage",
+            nodeId
+        };
+        var json = JsonConvert.SerializeObject(jsonData);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        // Отправляем POST-запрос
+        var response = await client.PostAsync("/arrived", content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Уведомление успешно обработано");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // Обработка ошибки 400 (Неверные данные)
+            Console.WriteLine($"Ошибка 400: Неверный запрос.");
+        }
+    }
+
     [HttpPost("load")]
     public async Task<ActionResult<BaggageResponse>> LoadBaggage([FromBody] BaggageLoadRequest request)
     {
@@ -127,85 +230,128 @@ public class BaggageController : ControllerBase
             return BadRequest(new ErrorResponse { Error = "Неверный запрос" });
         }
 
+        // Если свободные машины есть
+        bool waiting = false;
+
         // Считаем количество необходимых для перевозки машин
         int countCars = (int)Math.Ceiling((double)request.BaggageWeight / VehicleCapacity);
 
+        var tasks = new List<Task>();
+
         for (int i = 0; i < countCars; i++)
         {
-            // Ищем свободную машину
-            var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
-
-            // Проверяем, что такая машина найдена
-            if (foundVehicle.Key != null)
+            tasks.Add(Task.Run(async () =>
             {
-                string availableVehicleId = foundVehicle.Key;
-                string availableVehiclePlace = foundVehicle.Value;
+                Console.WriteLine($"Отправлена машина");
 
-                Console.WriteLine($"Найдена доступная машина: ID = {availableVehicleId}, местоположение = {availableVehiclePlace}");
+                string availableVehicleId = null;
+                string availableVehiclePlace = null;
 
-                //Дефолт для проверки
-                string[] routePoints = ["node1", "node2", "node3"];
-
-                // Получаем маршрут
-                // Реальный запрос
-                //var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
-                if (routePoints != null)
+                // Чтобы не взять одну и ту же машину
+                lock (lockObject)
                 {
-                    // Обработка полученных данных
-                    foreach (var point in routePoints)
+
+                    // Ищем свободную машину
+                    var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
+
+                    // Проверяем, что такая машина найдена
+                    if (foundVehicle.Key != null)
                     {
-                        Console.WriteLine("Маршрут:");
-                        Console.WriteLine($"ID точки: {point}");
-                        // В цикле:
-                        // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                        // Считаем время передвижения
-                        // Уведомляем о прибытии
-
-                        //Сообщаем, что прибыли на финальную точку
-                        //Возвращение в гараж
+                        availableVehicleId = foundVehicle.Key;
+                        availableVehiclePlace = foundVehicle.Value;
+                        vehicleNodeMapping[foundVehicle.Key] = "в пути";
                     }
+                }
+                if (availableVehicleId != null)
+                {
+                    Console.WriteLine($"Найдена доступная машина: ID = {availableVehicleId}, местоположение = {availableVehiclePlace}");
 
+                    bool back = false;
+
+                    for (int k = 0; k < 2; k++)
+                    {
+                        // Получаем маршрут
+                        //Дефолт для проверки
+                        string[] routePoints = ["node1", "node2", "node3"];
+                        // Реальный запрос
+                        //var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
+
+                        if (routePoints != null)
+                        {
+                            // Обработка полученных данных
+                            Console.WriteLine("Маршрут:");
+                            foreach (var point in routePoints)
+                            {
+                                Console.WriteLine($"ID точки: {point}");
+                            }
+
+                            // Движение по маршруту
+                            for (int j = 0; j < routePoints.Length - 1; j++)
+                            {
+                                // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
+                                // Дефолт
+                                double distanse = 100;
+                                // Реальный запрос
+                                //var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
+                                // ИЛИ НОЛЬ?
+                                if (distanse != null)
+                                {
+                                    // Считаем время в пути
+                                    int time = (int)Math.Ceiling(distanse / SpeedCar);
+                                    await Task.Delay(time * 1000);
+
+                                    // Уведомляем о прибытии
+                                    // Реальный запрос
+                                    //informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                }
+                            }
+
+                            //Сообщаем, что прибыли на финальную точку ОРКЕСТРАТОРУ
+                            // Если двигались к самолёту - совершаем загрузку
+                            if (back == false)
+                            {
+                                // Выполняем загрузку
+                                Console.WriteLine("Загрузка выполняется");
+                                await Task.Delay(5000);
+                                back = true;
+                            }
+                            // Если двигались к гаражу, помечаем машину как свободную
+                            else
+                            {
+                                Console.WriteLine($"Машина {availableVehicleId} прибыла в гараж");
+                                vehicleNodeMapping[availableVehicleId] = availableVehiclePlace;
+                            }
+
+                        }
+                        else
+                        {
+                            Console.WriteLine("Не удалось получить маршрут.");
+                        }
+                    }
                 }
                 else
                 {
-                    Console.WriteLine("Не удалось получить маршрут.");
+                    waiting = false;
+                    Console.WriteLine("Регистрация");
+                    // Регистрация новой машины
+                    // Реальный запрос
+                    /*var response = await RegisterVehicleAsync("baggage");
+
+                    if (response != null)
+                    {
+                        Console.WriteLine($"Зарегистрирована машина: Node ID: {response.NodeId}, Vehicle ID: {response.VehicleId}");
+                        vehicleNodeMapping.Add(response.VehicleId, response.NodeId);
+                        i--;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Запрос завершился неуспешно, данные отсутствуют.");
+                    }*/
                 }
-            }
-            else
-            {
-                // Регистрация новой машины
-                string vehicleType = "baggage";
-                var response = await RegisterVehicleAsync(vehicleType);
-
-                if (response != null)
-                {
-                    Console.WriteLine($"Node ID: {response.NodeId}, Vehicle ID: {response.VehicleId}");
-                    // Здесь логика
-                }
-                else
-                {
-                    Console.WriteLine("Запрос завершился неуспешно, данные отсутствуют.");
-                }
-            }
-
-
-
-
-
-
-
-
-
-
-
-            // Здесь должна быть логика обработки загрузки
-
-
-            // Если свободных машин нет
-            bool waiting = false; // Заменить на логику
-            return Ok(new BaggageResponse { Waiting = waiting });
+            }));
         }
-        return Ok(new BaggageResponse { Waiting = true });
+        await Task.WhenAll(tasks);
+        return Ok(new BaggageResponse { Waiting = waiting });
     }
 
     [HttpPost("upload")]
