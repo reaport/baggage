@@ -236,6 +236,16 @@ public class BaggageController : ControllerBase
         // Считаем количество необходимых для перевозки машин
         int countCars = (int)Math.Ceiling((double)request.BaggageWeight / VehicleCapacity);
 
+        // Проверяем, есть ли хотя бы одна свободная машина
+        lock (lockObject)
+        {
+            var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
+            if (foundVehicle.Key == null)
+            {
+                waiting = true; // Если нет свободных машин
+            }
+        }
+
         var tasks = new List<Task>();
 
         for (int i = 0; i < countCars; i++)
@@ -250,7 +260,6 @@ public class BaggageController : ControllerBase
                 // Чтобы не взять одну и ту же машину
                 lock (lockObject)
                 {
-
                     // Ищем свободную машину
                     var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
 
@@ -331,7 +340,6 @@ public class BaggageController : ControllerBase
                 }
                 else
                 {
-                    waiting = false;
                     Console.WriteLine("Регистрация");
                     // Регистрация новой машины
                     // Реальный запрос
@@ -350,7 +358,7 @@ public class BaggageController : ControllerBase
                 }
             }));
         }
-        await Task.WhenAll(tasks);
+        Task.WhenAll(tasks);
         return Ok(new BaggageResponse { Waiting = waiting });
     }
 
