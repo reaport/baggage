@@ -19,9 +19,9 @@ public class BaggageController : ControllerBase
     // Словарь для хранения машин
     private static readonly Dictionary<string, string> vehicleNodeMapping = new Dictionary<string, string>
     {
-        ["baggage1"] = "node1",
+        /*["baggage1"] = "node1",
         ["baggage2"] = "node2",
-        ["baggage3"] = "node3"
+        ["baggage3"] = "node3"*/
     };
     //new();
 
@@ -58,7 +58,7 @@ public class BaggageController : ControllerBase
     private async Task<RegisterVehicleResponse?> RegisterVehicleAsync(string vehicleType)
     {
         // Формирование URL для запроса
-        string url = $"/register-vehicle/{vehicleType}";
+        string url = $"https://ground-control.reaport.ru/register-vehicle/{vehicleType}";
 
         // Отправка POST-запроса
         var response = await client.PostAsync(url, null);
@@ -104,7 +104,7 @@ public class BaggageController : ControllerBase
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Отправляем POST-запрос
-        var response = await client.PostAsync("/route", content);
+        var response = await client.PostAsync("https://ground-control.reaport.ru/route", content);
 
         if (response.IsSuccessStatusCode)
         {
@@ -147,7 +147,7 @@ public class BaggageController : ControllerBase
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Отправляем POST-запрос
-        var response = await client.PostAsync("/move", content);
+        var response = await client.PostAsync("https://ground-control.reaport.ru/move", content);
 
         if (response.IsSuccessStatusCode)
         {
@@ -159,7 +159,7 @@ public class BaggageController : ControllerBase
         else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             // Обработка ошибки 400 (Неверные данные)
-            Console.WriteLine($"Ошибка 400: Неверный запрос.");
+            Console.WriteLine($"Ошибка 400 GetPermissionAsync: Неверный запрос.");
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
         {
@@ -174,7 +174,7 @@ public class BaggageController : ControllerBase
         else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             // Обработка ошибки 409 (Узел занят)
-            Console.WriteLine($"Узел сейчас занят, попробуйте позже");
+            Console.WriteLine($"{vehicleId}: Узел {to} сейчас занят, попробуйте позже");
             // Добавляем 1-секундную задержку перед повторным вызовом функции
             await Task.Delay(1000);
             // Повторный вызов функции с теми же параметрами
@@ -205,16 +205,16 @@ public class BaggageController : ControllerBase
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Отправляем POST-запрос
-        var response = await client.PostAsync("/arrived", content);
+        var response = await client.PostAsync("https://ground-control.reaport.ru/arrived", content);
 
         if (response.IsSuccessStatusCode)
         {
-            Console.WriteLine("Уведомление успешно обработано");
+            Console.WriteLine("Уведомление о прибытии успешно доставлено");
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             // Обработка ошибки 400 (Неверные данные)
-            Console.WriteLine($"Ошибка 400: Неверный запрос.");
+            Console.WriteLine($"Ошибка 400 informAboutArrivalAsync: Неверный запрос.");
         }
     }
 
@@ -278,14 +278,15 @@ public class BaggageController : ControllerBase
                     {
                         // Получаем маршрут
                         //Дефолт для проверки
-                        string[] routePoints = ["node1", "node2", "node3"];
+                        //string[] routePoints = ["node1", "node2", "node3"];
                         // Реальный запрос
-                        //var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
+                        //request.AircraftCoordinates
+                        var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
 
                         if (routePoints != null)
                         {
                             // Обработка полученных данных
-                            Console.WriteLine("Маршрут:");
+                            Console.WriteLine($"Маршрут для {availableVehicleId}:");
                             foreach (var point in routePoints)
                             {
                                 Console.WriteLine($"ID точки: {point}");
@@ -296,19 +297,20 @@ public class BaggageController : ControllerBase
                             {
                                 // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
                                 // Дефолт
-                                double distanse = 100;
+                                //double distanse = 100;
                                 // Реальный запрос
-                                //var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
+                                var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
                                 // ИЛИ НОЛЬ?
                                 if (distanse != null)
                                 {
+                                    Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                     // Считаем время в пути
-                                    int time = (int)Math.Ceiling(distanse / SpeedCar);
+                                    int time = (int)Math.Ceiling((double)distanse / SpeedCar);
                                     await Task.Delay(time * 1000);
 
                                     // Уведомляем о прибытии
                                     // Реальный запрос
-                                    //informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                    informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 }
                             }
 
@@ -337,10 +339,9 @@ public class BaggageController : ControllerBase
                 }
                 else
                 {
-                    Console.WriteLine("Регистрация");
                     // Регистрация новой машины и отправление её к самолёту
                     // Реальный запрос
-                    /*var response = await RegisterVehicleAsync("baggage");
+                    var response = await RegisterVehicleAsync("baggage");
 
                     if (response != null)
                     {
@@ -356,14 +357,14 @@ public class BaggageController : ControllerBase
                         {
                             // Получаем маршрут
                             //Дефолт для проверки
-                            string[] routePoints = ["node1", "node2", "node3"];
-                            // Реальный запрос
-                            //var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
+                            //string[] routePoints = ["node1", "node2", "node3"];
+                            // Реальный запрос 
+                            var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
 
                             if (routePoints != null)
                             {
                                 // Обработка полученных данных
-                                Console.WriteLine("Маршрут:");
+                                Console.WriteLine($"Маршрут для {availableVehicleId}:");
                                 foreach (var point in routePoints)
                                 {
                                     Console.WriteLine($"ID точки: {point}");
@@ -374,19 +375,20 @@ public class BaggageController : ControllerBase
                                 {
                                     // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
                                     // Дефолт
-                                    double distanse = 100;
+                                    //double distanse = 100;
                                     // Реальный запрос
-                                    //var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
+                                    var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
                                     // ИЛИ НОЛЬ?
                                     if (distanse != null)
                                     {
+                                        Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                         // Считаем время в пути
-                                        int time = (int)Math.Ceiling(distanse / SpeedCar);
+                                        int time = (int)Math.Ceiling((double)distanse / SpeedCar);
                                         await Task.Delay(time * 1000);
 
                                         // Уведомляем о прибытии
                                         // Реальный запрос
-                                        //informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                        informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                     }
                                 }
 
@@ -416,7 +418,7 @@ public class BaggageController : ControllerBase
                     else
                     {
                         Console.WriteLine("Запрос завершился неуспешно, данные отсутствуют.");
-                    }*/
+                    }
                 }
             }));
         }
@@ -630,9 +632,7 @@ public class BaggageController : ControllerBase
 }
 
 // Добавить ручки Никиты (жду Никиту)
-// Сделать ограничение по машинам
-// Протестировать в постман
-// Протестировать с ребятами
-// Сделать html страничку
+// Протестировать с ребятами (жду Никиту)
+// Сделать html страничку 
 // Почистить код
 // Написать документацию
