@@ -8,10 +8,8 @@ using Newtonsoft.Json;
 [ApiController]
 public class BaggageController : ControllerBase
 {
-    private static readonly HttpClient client = new();
-
     // Вместимость одной машины
-    private double VehicleCapacity = 500.0;
+    private static double VehicleCapacity = 500.0;
 
     // Скорость машины (в м/с)
     private const double SpeedCar = 8;
@@ -57,6 +55,7 @@ public class BaggageController : ControllerBase
 
     private async Task<RegisterVehicleResponse?> RegisterVehicleAsync(string vehicleType)
     {
+        HttpClient client = new();
         // Формирование URL для запроса
         string url = $"https://ground-control.reaport.ru/register-vehicle/{vehicleType}";
 
@@ -91,6 +90,8 @@ public class BaggageController : ControllerBase
 
     private async Task<string[]?> GetRouteAsync(string from, string to)
     {
+        HttpClient client = new();
+        Console.WriteLine("Зашли в функцию");
         client.DefaultRequestHeaders.Accept.Clear();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         // Создаем тело запроса
@@ -103,8 +104,10 @@ public class BaggageController : ControllerBase
         var json = JsonConvert.SerializeObject(jsonData);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+        Console.WriteLine("Пытаюсь отправить пост запрос");
         // Отправляем POST-запрос
         var response = await client.PostAsync("https://ground-control.reaport.ru/route", content);
+        Console.WriteLine("Пост запрос отправлен");
 
         if (response.IsSuccessStatusCode)
         {
@@ -133,6 +136,7 @@ public class BaggageController : ControllerBase
 
     private async Task<double?> GetPermissionAsync(string vehicleId, string from, string to)
     {
+        HttpClient client = new();
         client.DefaultRequestHeaders.Accept.Clear();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         // Создаем тело запроса
@@ -174,7 +178,7 @@ public class BaggageController : ControllerBase
         else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             // Обработка ошибки 409 (Узел занят)
-            Console.WriteLine($"{vehicleId}: Узел {to} сейчас занят, попробуйте позже");
+            Console.WriteLine($"{vehicleId}: Пытаюсь попасть из узла {from}. Узел {to} сейчас занят, попробуйте позже");
             // Добавляем 1-секундную задержку перед повторным вызовом функции
             await Task.Delay(1000);
             // Повторный вызов функции с теми же параметрами
@@ -192,6 +196,7 @@ public class BaggageController : ControllerBase
 
     private async void informAboutArrivalAsync(string vehicleId, string nodeId)
     {
+        HttpClient client = new();
         client.DefaultRequestHeaders.Accept.Clear();
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         // Создаем тело запроса
@@ -359,6 +364,7 @@ public class BaggageController : ControllerBase
                             //Дефолт для проверки
                             //string[] routePoints = ["node1", "node2", "node3"];
                             // Реальный запрос 
+                            Console.WriteLine("Пытаюсь получить маршрут");
                             var routePoints = await GetRouteAsync(availableVehiclePlace, request.AircraftCoordinates);
 
                             if (routePoints != null)
@@ -629,6 +635,28 @@ public class BaggageController : ControllerBase
         Task.WhenAll(tasks);
         return Ok(new BaggageResponse { Waiting = waiting });
     }
+
+
+
+    private static async Task HandleSetCapacity(HttpContext context)
+    {
+        var request = await context.Request.ReadFromJsonAsync<CapacityRequest>();
+        if (request != null)
+        {
+            VehicleCapacity = request.Capacity;
+            await context.Response.WriteAsync("OK");
+        }
+        else
+        {
+            context.Response.StatusCode = 400;
+        }
+    }
+
+    public class CapacityRequest
+    {
+        public int Capacity { get; set; }
+    }
+
 }
 
 // Добавить ручки Никиты (жду Никиту)
