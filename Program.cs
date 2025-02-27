@@ -23,10 +23,15 @@ namespace BaggageServer
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
+            app.UseDefaultFiles(); // Позволяет обслуживать index.html
+            app.UseStaticFiles(); // Позволяет обслуживать статические файлы                                   
+            app.UseCors(builder => // Добавляем CORS
+                builder.WithOrigins("http://127.0.0.1:5500") // Здесь укажите разрешенные источники
+                       .AllowAnyHeader()
+                       .AllowAnyMethod());
 
             app.UseAuthorization();
-
 
             app.MapControllers();
 

@@ -1,0 +1,74 @@
+<!-- wwwroot/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Capacity</title>
+    <script>
+        async function fetchCapacity() {
+            try {
+                // Отправка запроса на сервер
+                const response = await fetch('http://localhost:5191/getCapacity');
+                console.log('Fetching capacity...'); // Логируем начало запроса
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                // Получение данных из ответа
+                const data = await response.json();
+                console.log('Response data:', data); // Логируем ответ сервера
+
+                // Проверка наличия свойства capacity
+                if (data && data.capacity !== undefined) {
+                    // Отобразим вместимость с двумя знаками после запятой
+                    document.getElementById('capacity').innerText = data.capacity.toFixed(2);
+                } else {
+                    console.error("Capacity not found in response");
+                }
+            } catch (error) {
+                console.error('There was a problem with the fetch operation:', error);
+            }
+        }
+
+        async function updateCapacity(event) {
+            event.preventDefault(); // Отменяем стандартное поведение формы
+            const newCapacity = document.getElementById('newCapacity').value;
+
+            try {
+                console.log('Updating capacity to:', newCapacity); // Логируем новое значение вместимости
+
+                const response = await fetch('http://localhost:5191/updateCapacity', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ capacity: parseFloat(newCapacity) }), // Используем parseFloat для десятичного значения
+                });
+
+                if (response.ok) {
+                    console.log('Capacity updated successfully'); // Логируем успешное обновление
+                    fetchCapacity(); // Обновляем текущее значение на странице
+                } else {
+                    alert("Failed to update capacity.");
+                    console.error('Update failed:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('There was a problem with the update operation:', error);
+            }
+        }
+
+        window.onload = fetchCapacity; // Загружаем значение при загрузке страницы
+    </script>
+</head>
+<body>
+    <h1>Vehicle Capacity</h1>
+    <p>Current Capacity: <span id="capacity">Loading...</span></p>
+    <form id="capacityForm" onsubmit="updateCapacity(event)">
+        <label for="newCapacity">New Capacity:</label>
+        <input type="number" id="newCapacity" min="0" step="0.01" required> <!-- Добавлен атрибут step для десятичных значений -->
+        <button type="submit">Update Capacity</button>
+    </form>
+</body>
+</html>
