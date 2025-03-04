@@ -15,26 +15,17 @@ public class BaggageController : ControllerBase
     // Вместимость одной машины
     private static VehicleCapacity _vehicleCapacity = new VehicleCapacity { Capacity = 500 };
 
-    //private static double VehicleCapacity = 500.0;
-
     // Скорость машины (в м/с)
     private const double SpeedCar = 8;
 
-    // Словарь для хранения машин
+    // Словарь для хранения машин и их местоположения
     private static readonly Dictionary<string, string> vehicleNodeMapping = new Dictionary<string, string>
     {
-        /*["baggage1"] = "node1",
-        ["baggage2"] = "node2",
-        ["baggage3"] = "node3"*/
     };
-    //new();
 
+    // Словарь для хранения парковок у самолёта
     private static readonly Dictionary<string, Dictionary<string, string>> vehicleNodeMappingPlace = new Dictionary<string, Dictionary<string, string>>
     {
-        /*["baggage1"] =  "airplane_parking_1": "airplane_parking_1_baggage_1",
-    "airplane_parking_2": "airplane_parking_2_baggage_1",
-        ["baggage2"] = "node2",
-        ["baggage3"] = "node3"*/
     };
 
     public class BaggageLoadRequest
@@ -278,56 +269,25 @@ public class BaggageController : ControllerBase
                 // Чтобы не взять одну и ту же машину
                 lock (lockObject)
                 {
-                    foreach (var innerPair in vehicleNodeMapping)
-                    {
-                        Console.WriteLine($"  0Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                    }
                     // Ищем свободную машину
                     var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
 
                     // Проверяем, что такая машина найдена
                     if (foundVehicle.Key != null)
                     {
-                        /*foreach (var innerPair in vehicleNodeMapping)
-                        {
-                            if (innerPair.Value != "в пути")
-                            {
-                                availableVehicleId = innerPair.Key;
-                                availableVehiclePlace = innerPair.Value;
-                            }
-                        }*/
-                        /*foreach (var outerPair in vehicleNodeMappingPlace)
-                        {
-                            Console.WriteLine($"Ключ внешнего словаря: {outerPair.Key}");
-                            foreach (var innerPair in outerPair.Value)
-                            {
-                                Console.WriteLine($"  Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                            }
-                        }*/
                         availableVehicleId = foundVehicle.Key;
                         availableVehiclePlace = foundVehicle.Value;
-                        //Console.WriteLine($"Машина {response.VehicleId}, местоположение нужного самолёта: {response.serviceSpots[request.AircraftCoordinates]} добавлена в словарь");
                         
                         var innerDictionary = vehicleNodeMappingPlace[foundVehicle.Key];
                         availableVehiclePlacePlane = innerDictionary[request.AircraftCoordinates];
                         vehicleNodeMapping[foundVehicle.Key] = "в пути";
-                        foreach (var innerPair in vehicleNodeMapping)
-                        {
-                            Console.WriteLine($"  1Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                        }
                     }
                 }
                 if (availableVehicleId != null)
                 {
-                    foreach (var innerPair in vehicleNodeMapping)
-                    {
-                        Console.WriteLine($"2  Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                    }
                     Console.WriteLine($"Найдена доступная машина: ID = {availableVehicleId}, местоположение = {availableVehiclePlace}");
                     // Получаем маршрут
-                    //Дефолт для проверки
-                    //string[] routePoints = ["node1", "node2", "node3"];
-                    // Реальный запрос
+                    // Дефолт для проверки string[] routePoints = ["node1", "node2", "node3"];
                     var routePoints = await GetRouteAsync(availableVehiclePlace, availableVehiclePlacePlane);
 
                     if (routePoints != null)
@@ -342,12 +302,10 @@ public class BaggageController : ControllerBase
                         // Движение по маршруту
                         for (int j = 0; j < routePoints.Length - 1; j++)
                         {
-                            // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                            // Дефолт
-                            //double distanse = 100;
-                            // Реальный запрос
+                            // Запрашиваем разрешение на передвижение
+                            // Дефолт double distanse = 100;
                             var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                            // ИЛИ НОЛЬ?
+
                             if (distanse != null)
                             {
                                 Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
@@ -356,15 +314,13 @@ public class BaggageController : ControllerBase
 
                                 await Task.Delay(time * 1000);
 
-                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 // Уведомляем о прибытии
-                                // Реальный запрос
-
+                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                             }
                         }
 
-                        //Сообщаем, что прибыли на финальную точку ОРКЕСТРАТОРУ
-                        // Если двигались к самолёту - совершаем загрузку
+                        //Сообщаем, что прибыли на финальную точку оркестратору
+                        // ЗДЕСЬ БУДЕТ ЗАПРОС
 
                         // Выполняем загрузку
                         Console.WriteLine("Загрузка выполняется");
@@ -380,7 +336,6 @@ public class BaggageController : ControllerBase
 
                     if (routePoints != null)
                     {
-                        // Обработка полученных данных
                         Console.WriteLine($"Маршрут для {availableVehicleId}:");
                         foreach (var point in routePoints)
                         {
@@ -390,12 +345,11 @@ public class BaggageController : ControllerBase
                         // Движение по маршруту
                         for (int j = 0; j < routePoints.Length - 1; j++)
                         {
-                            // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                            // Дефолт
-                            //double distanse = 100;
+                            // Запрашиваем разрешение на передвижение 
+                            // Дефолт double distanse = 100;
                             // Реальный запрос
                             var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                            // ИЛИ НОЛЬ?
+
                             if (distanse != null)
                             {
                                 Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
@@ -404,13 +358,12 @@ public class BaggageController : ControllerBase
 
                                 await Task.Delay(time * 1000);
 
-                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 // Уведомляем о прибытии
-                                // Реальный запрос
+                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                             }
                         }
-                        // Помечаем машину как свободную
 
+                        // Помечаем машину как свободную
                         Console.WriteLine($"Машина {availableVehicleId} прибыла в гараж");
                         vehicleNodeMapping[availableVehicleId] = availableVehiclePlace;
                     }
@@ -422,10 +375,7 @@ public class BaggageController : ControllerBase
                 else
                 {
                     // Регистрация новой машины и отправление её к самолёту
-                    // Реальный запрос
-                    Console.WriteLine("Попытка зайти в функцию зарегистрировать машину");
                     var response = await RegisterVehicleAsync("baggage");
-                    Console.WriteLine("Вышли из функции регистрации");
 
                     if (response != null)
                     {
@@ -437,15 +387,11 @@ public class BaggageController : ControllerBase
 
                         availableVehicleId = response.VehicleId;
                         availableVehiclePlace = response.garrageNodeId;
-                        //var innerDictionary = vehicleNodeMappingPlace[response.garrageNodeId];
                         availableVehiclePlacePlane = response.serviceSpots[request.AircraftCoordinates];
-                        Console.WriteLine($"Парковка у самолёта: {availableVehiclePlacePlane}");
 
                         // Получаем маршрут
-                        //Дефолт для проверки
-                        //string[] routePoints = ["node1", "node2", "node3"];
-                        // Реальный запрос 
-                        Console.WriteLine($"Попытка зайти в функцию получить маршрут от {availableVehiclePlace} до {availableVehiclePlacePlane}");
+                        //Дефолт для проверки string[] routePoints = ["node1", "node2", "node3"];
+                        // Реальный запрос
                         var routePoints = await GetRouteAsync(availableVehiclePlace, availableVehiclePlacePlane);
 
                             if (routePoints != null)
@@ -460,33 +406,28 @@ public class BaggageController : ControllerBase
                                 // Движение по маршруту
                                 for (int j = 0; j < routePoints.Length - 1; j++)
                                 {
-                                    // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                                    // Дефолт
-                                    //double distanse = 100;
+                                    // Запрашиваем разрешение на передвижение 
+                                    // Дефолт double distanse = 100;
                                     // Реальный запрос
                                     var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                                    // ИЛИ НОЛЬ?
+
                                     if (distanse != null)
                                     {
                                         Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                         // Считаем время в пути
                                         int time = (int)Math.Ceiling((double)distanse / SpeedCar);
-                                    // Поменять
-                                        await Task.Delay(time * 100);
-
-                                        await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                        await Task.Delay(time * 1000);
                                         // Уведомляем о прибытии
-                                        // Реальный запрос
-
+                                        await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                     }
                                 }
 
                                 //Сообщаем, что прибыли на финальную точку ОРКЕСТРАТОРУ
-                                // Если двигались к самолёту - совершаем загрузку
+                                // ЗДЕСЬ БУДЕТ ЗАПРОС
 
                                 // Выполняем загрузку
                                 Console.WriteLine("Загрузка выполняется");
-                                await Task.Delay(500);
+                                await Task.Delay(5000);
                             }
                             else
                             {
@@ -498,7 +439,6 @@ public class BaggageController : ControllerBase
 
                             if (routePoints != null)
                             {
-                                // Обработка полученных данных
                                 Console.WriteLine($"Маршрут для {availableVehicleId}:");
                                 foreach (var point in routePoints)
                                 {
@@ -508,27 +448,23 @@ public class BaggageController : ControllerBase
                                 // Движение по маршруту
                                 for (int j = 0; j < routePoints.Length - 1; j++)
                                 {
-                                    // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                                    // Дефолт
-                                    //double distanse = 100;
+                                    // Запрашиваем разрешение на передвижение
+                                    // Дефолт double distanse = 100;
                                     // Реальный запрос
                                     var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                                    // ИЛИ НОЛЬ?
                                     if (distanse != null)
                                     {
                                         Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                         // Считаем время в пути
                                         int time = (int)Math.Ceiling((double)distanse / SpeedCar);
 
-                                        await Task.Delay(time * 100);
-
-                                        await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                        await Task.Delay(time * 1000);
                                         // Уведомляем о прибытии
-                                        // Реальный запрос
+                                        await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);                                      
                                     }
                                 }
+                                
                                 // Помечаем машину как свободную
-
                                 Console.WriteLine($"Машина {availableVehicleId} прибыла в гараж");
                                 vehicleNodeMapping[availableVehicleId] = availableVehiclePlace;
                             }
@@ -587,56 +523,25 @@ public class BaggageController : ControllerBase
                 // Чтобы не взять одну и ту же машину
                 lock (lockObject)
                 {
-                    foreach (var innerPair in vehicleNodeMapping)
-                    {
-                        Console.WriteLine($"  0Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                    }
                     // Ищем свободную машину
                     var foundVehicle = vehicleNodeMapping.FirstOrDefault(nodeId => nodeId.Value != "в пути");
 
                     // Проверяем, что такая машина найдена
                     if (foundVehicle.Key != null)
                     {
-                        /*foreach (var innerPair in vehicleNodeMapping)
-                        {
-                            if (innerPair.Value != "в пути")
-                            {
-                                availableVehicleId = innerPair.Key;
-                                availableVehiclePlace = innerPair.Value;
-                            }
-                        }*/
-                        /*foreach (var outerPair in vehicleNodeMappingPlace)
-                        {
-                            Console.WriteLine($"Ключ внешнего словаря: {outerPair.Key}");
-                            foreach (var innerPair in outerPair.Value)
-                            {
-                                Console.WriteLine($"  Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                            }
-                        }*/
                         availableVehicleId = foundVehicle.Key;
                         availableVehiclePlace = foundVehicle.Value;
-                        //Console.WriteLine($"Машина {response.VehicleId}, местоположение нужного самолёта: {response.serviceSpots[request.AircraftCoordinates]} добавлена в словарь");
 
                         var innerDictionary = vehicleNodeMappingPlace[foundVehicle.Key];
                         availableVehiclePlacePlane = innerDictionary[request.AircraftCoordinates];
                         vehicleNodeMapping[foundVehicle.Key] = "в пути";
-                        foreach (var innerPair in vehicleNodeMapping)
-                        {
-                            Console.WriteLine($"  1Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                        }
                     }
                 }
                 if (availableVehicleId != null)
                 {
-                    foreach (var innerPair in vehicleNodeMapping)
-                    {
-                        Console.WriteLine($"2  Ключ внутреннего словаря: {innerPair.Key}, Значение: {innerPair.Value}");
-                    }
                     Console.WriteLine($"Найдена доступная машина: ID = {availableVehicleId}, местоположение = {availableVehiclePlace}");
                     // Получаем маршрут
-                    //Дефолт для проверки
-                    //string[] routePoints = ["node1", "node2", "node3"];
-                    // Реальный запрос
+                    // Дефолт для проверки string[] routePoints = ["node1", "node2", "node3"];
                     var routePoints = await GetRouteAsync(availableVehiclePlace, availableVehiclePlacePlane);
 
                     if (routePoints != null)
@@ -651,12 +556,10 @@ public class BaggageController : ControllerBase
                         // Движение по маршруту
                         for (int j = 0; j < routePoints.Length - 1; j++)
                         {
-                            // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                            // Дефолт
-                            //double distanse = 100;
-                            // Реальный запрос
+                            // Запрашиваем разрешение на передвижение
+                            // Дефолт double distanse = 100;
                             var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                            // ИЛИ НОЛЬ?
+
                             if (distanse != null)
                             {
                                 Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
@@ -665,18 +568,16 @@ public class BaggageController : ControllerBase
 
                                 await Task.Delay(time * 1000);
 
-                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 // Уведомляем о прибытии
-                                // Реальный запрос
-
+                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                             }
                         }
 
-                        //Сообщаем, что прибыли на финальную точку ОРКЕСТРАТОРУ
-                        // Если двигались к самолёту - совершаем загрузку
+                        //Сообщаем, что прибыли на финальную точку оркестратору
+                        // ЗДЕСЬ БУДЕТ ЗАПРОС
 
                         // Выполняем загрузку
-                        Console.WriteLine("Загрузка выполняется");
+                        Console.WriteLine("Разгрузка выполняется");
                         await Task.Delay(5000);
                     }
                     else
@@ -689,7 +590,6 @@ public class BaggageController : ControllerBase
 
                     if (routePoints != null)
                     {
-                        // Обработка полученных данных
                         Console.WriteLine($"Маршрут для {availableVehicleId}:");
                         foreach (var point in routePoints)
                         {
@@ -699,12 +599,11 @@ public class BaggageController : ControllerBase
                         // Движение по маршруту
                         for (int j = 0; j < routePoints.Length - 1; j++)
                         {
-                            // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                            // Дефолт
-                            //double distanse = 100;
+                            // Запрашиваем разрешение на передвижение 
+                            // Дефолт double distanse = 100;
                             // Реальный запрос
                             var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                            // ИЛИ НОЛЬ?
+
                             if (distanse != null)
                             {
                                 Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
@@ -713,13 +612,12 @@ public class BaggageController : ControllerBase
 
                                 await Task.Delay(time * 1000);
 
-                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 // Уведомляем о прибытии
-                                // Реальный запрос
+                                await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                             }
                         }
-                        // Помечаем машину как свободную
 
+                        // Помечаем машину как свободную
                         Console.WriteLine($"Машина {availableVehicleId} прибыла в гараж");
                         vehicleNodeMapping[availableVehicleId] = availableVehiclePlace;
                     }
@@ -731,10 +629,7 @@ public class BaggageController : ControllerBase
                 else
                 {
                     // Регистрация новой машины и отправление её к самолёту
-                    // Реальный запрос
-                    Console.WriteLine("Попытка зайти в функцию зарегистрировать машину");
                     var response = await RegisterVehicleAsync("baggage");
-                    Console.WriteLine("Вышли из функции регистрации");
 
                     if (response != null)
                     {
@@ -746,15 +641,11 @@ public class BaggageController : ControllerBase
 
                         availableVehicleId = response.VehicleId;
                         availableVehiclePlace = response.garrageNodeId;
-                        //var innerDictionary = vehicleNodeMappingPlace[response.garrageNodeId];
                         availableVehiclePlacePlane = response.serviceSpots[request.AircraftCoordinates];
-                        Console.WriteLine($"Парковка у самолёта: {availableVehiclePlacePlane}");
 
                         // Получаем маршрут
-                        //Дефолт для проверки
-                        //string[] routePoints = ["node1", "node2", "node3"];
-                        // Реальный запрос 
-                        Console.WriteLine($"Попытка зайти в функцию получить маршрут от {availableVehiclePlace} до {availableVehiclePlacePlane}");
+                        //Дефолт для проверки string[] routePoints = ["node1", "node2", "node3"];
+                        // Реальный запрос
                         var routePoints = await GetRouteAsync(availableVehiclePlace, availableVehiclePlacePlane);
 
                         if (routePoints != null)
@@ -769,33 +660,28 @@ public class BaggageController : ControllerBase
                             // Движение по маршруту
                             for (int j = 0; j < routePoints.Length - 1; j++)
                             {
-                                // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                                // Дефолт
-                                //double distanse = 100;
+                                // Запрашиваем разрешение на передвижение 
+                                // Дефолт double distanse = 100;
                                 // Реальный запрос
                                 var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                                // ИЛИ НОЛЬ?
+
                                 if (distanse != null)
                                 {
                                     Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                     // Считаем время в пути
                                     int time = (int)Math.Ceiling((double)distanse / SpeedCar);
-                                    // Поменять
-                                    await Task.Delay(time * 100);
-
-                                    await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                    await Task.Delay(time * 1000);
                                     // Уведомляем о прибытии
-                                    // Реальный запрос
-
+                                    await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 }
                             }
 
                             //Сообщаем, что прибыли на финальную точку ОРКЕСТРАТОРУ
-                            // Если двигались к самолёту - совершаем загрузку
+                            // ЗДЕСЬ БУДЕТ ЗАПРОС
 
                             // Выполняем загрузку
-                            Console.WriteLine("Загрузка выполняется");
-                            await Task.Delay(500);
+                            Console.WriteLine("Разгрузка выполняется");
+                            await Task.Delay(5000);
                         }
                         else
                         {
@@ -807,7 +693,6 @@ public class BaggageController : ControllerBase
 
                         if (routePoints != null)
                         {
-                            // Обработка полученных данных
                             Console.WriteLine($"Маршрут для {availableVehicleId}:");
                             foreach (var point in routePoints)
                             {
@@ -817,27 +702,23 @@ public class BaggageController : ControllerBase
                             // Движение по маршруту
                             for (int j = 0; j < routePoints.Length - 1; j++)
                             {
-                                // Запрашиваем разрешение на передвижение (повторно, если необходимо тоже)
-                                // Дефолт
-                                //double distanse = 100;
+                                // Запрашиваем разрешение на передвижение
+                                // Дефолт double distanse = 100;
                                 // Реальный запрос
                                 var distanse = await GetPermissionAsync(availableVehicleId, routePoints[j], routePoints[j + 1]);
-                                // ИЛИ НОЛЬ?
                                 if (distanse != null)
                                 {
                                     Console.WriteLine($"{availableVehicleId} двигается от {routePoints[j]} до {routePoints[j + 1]}");
                                     // Считаем время в пути
                                     int time = (int)Math.Ceiling((double)distanse / SpeedCar);
 
-                                    await Task.Delay(time * 100);
-
-                                    await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
+                                    await Task.Delay(time * 1000);
                                     // Уведомляем о прибытии
-                                    // Реальный запрос
+                                    await informAboutArrivalAsync(availableVehicleId, routePoints[j + 1]);
                                 }
                             }
-                            // Помечаем машину как свободную
 
+                            // Помечаем машину как свободную
                             Console.WriteLine($"Машина {availableVehicleId} прибыла в гараж");
                             vehicleNodeMapping[availableVehicleId] = availableVehiclePlace;
                         }
@@ -881,6 +762,4 @@ public class BaggageController : ControllerBase
 
 // Добавить ручки Никиты (жду Никиту)
 // Протестировать с Никитой (жду Никиту)
-// Сделать html страничку 
-// Почистить код
 // Написать документацию
