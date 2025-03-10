@@ -51,7 +51,7 @@
                     console.log('Capacity updated successfully'); // Логируем успешное обновление
                     fetchCapacity(); // Обновляем текущее значение на странице
                 } else {
-                    alert("Failed to update capacity.");
+                    alert("Необходимо ввести число больше 3000.");
                     console.error('Update failed:', response.status, response.statusText);
                 }
             } catch (error) {
