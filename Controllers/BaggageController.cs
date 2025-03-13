@@ -346,9 +346,9 @@ public class BaggageController : ControllerBase
     public async Task<ActionResult<BaggageResponse>> LoadBaggage([FromBody] BaggageLoadRequest request)
     {
         // Проверка на корректный запрос
+        Console.WriteLine(request.AircraftId, request.BaggageWeight, request.AircraftCoordinates);
         if (request == null || string.IsNullOrEmpty(request.AircraftId) || request.BaggageWeight <= 0 || string.IsNullOrEmpty(request.AircraftCoordinates))
         {
-            Console.WriteLine(request.AircraftId, request.BaggageWeight, request.AircraftCoordinates);
             return BadRequest(new ErrorResponse { Error = "Неверный запрос" });
         }
 
