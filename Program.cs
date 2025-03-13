@@ -1,4 +1,4 @@
-
+п»ї
 namespace BaggageServer
 {
     public class Program
@@ -24,10 +24,10 @@ namespace BaggageServer
             }
 
             //app.UseHttpsRedirection();
-            app.UseDefaultFiles(); // Позволяет обслуживать index.html
-            app.UseStaticFiles(); // Позволяет обслуживать статические файлы                                   
-            app.UseCors(builder => // Добавляем CORS
-                builder.WithOrigins("http://127.0.0.1:5500") // Здесь укажите разрешенные источники
+            app.UseDefaultFiles(); // РџРѕР·РІРѕР»СЏРµС‚ РѕР±СЃР»СѓР¶РёРІР°С‚СЊ index.html
+            app.UseStaticFiles(); // РџРѕР·РІРѕР»СЏРµС‚ РѕР±СЃР»СѓР¶РёРІР°С‚СЊ СЃС‚Р°С‚РёС‡РµСЃРєРёРµ С„Р°Р№Р»С‹                                   
+            app.UseCors(builder => // Р”РѕР±Р°РІР»СЏРµРј CORS
+                builder.WithOrigins("https://baggage.reaport.ru/") 
                        .AllowAnyHeader()
                        .AllowAnyMethod());
 
